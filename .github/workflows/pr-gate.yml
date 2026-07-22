@@ -19,7 +19,7 @@ jobs:
 
       # The caret on @revturbine/cli is what keeps this package write-once
       # (plan 142 REQ-2). Nothing else would catch a "tidying" pin.
-      - run: npm run check:caret
+      - run: npm run check:range
 
       - name: Smoke — the shim actually reaches revturbine init
         run: |
