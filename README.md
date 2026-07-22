@@ -28,13 +28,18 @@ Both entry points run the same code:
 Use the second when the CLI is already pinned in the repo — adding RevTurbine to
 another package in a monorepo, or re-running the scaffold later.
 
-## Why the dependency is a caret
+## Why the dependency is a `>=X.Y.Z <1` range
 
-`@revturbine/cli` is depended on with a **caret range**, deliberately. That
-resolves the newest matching CLI at run time, so scaffold improvements reach
-`npm create revturbine@latest` through ordinary CLI releases and this package
-almost never needs republishing. An exact pin would mean lockstep releases
-across two packages. `npm run check:caret` gates it.
+`@revturbine/cli` is depended on with an explicit **pre-1.0-spanning range**
+(`>=0.9.0 <1`), deliberately. That resolves the newest matching CLI at run time,
+so scaffold improvements reach `npm create revturbine@latest` through ordinary
+CLI releases and this package almost never needs republishing.
+
+It is **not** a caret, and that distinction bit us: for a `0.x` version npm
+reads `^0.8.0` as `>=0.8.0 <0.9.0` — it caps at the current minor and would
+silently freeze the shim (that bug shipped in `0.1.0`). The `<1` upper bound
+runs the range up to the deliberate 1.0 breaking milestone, where a shim bump
+is appropriate. `npm run check:range` gates it and rejects any caret/tilde.
 
 Note this is the **opposite** of what the scaffold installs into *your* repo,
 where `@revturbine/cli` is pinned **exactly** — the CLI bundles a
@@ -64,14 +69,15 @@ To cut a release until then:
 
 ```bash
 # 1. bump the version in package.json, commit, merge to main
-# 2. tag and push
-git tag v0.1.0 && git push origin v0.1.0
+# 2. tag and push (match the new package.json version)
+git tag vX.Y.Z && git push origin vX.Y.Z
 # 3. publish (npm 2FA prompts for an OTP or browser approval)
 npm publish --access public
 ```
 
-Run `npm run check:caret` first — it is what keeps the `@revturbine/cli`
-dependency a caret, and nothing else would catch a pin.
+Run `npm run check:range` first — it is what keeps the `@revturbine/cli`
+range spanning pre-1.0 minors, and nothing else would catch a caret that
+silently freezes the shim.
 
 ## Links
 

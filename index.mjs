@@ -12,10 +12,12 @@
  *   npm create revturbine@latest   → this shim → revturbine init
  *   pnpm exec revturbine init      → revturbine init
  *
- * The dependency on @revturbine/cli is a CARET on purpose (REQ-2): it resolves
- * the newest matching CLI at run time, so scaffold improvements ship through
- * ordinary CLI releases and this package is effectively write-once. Pinning it
- * exactly would silently reintroduce lockstep releases across two packages.
+ * The dependency on @revturbine/cli is a PRE-1.0-SPANNING RANGE on purpose
+ * (`>=X.Y.Z <1`, REQ-2): it resolves the newest matching CLI at run time, so
+ * scaffold improvements ship through ordinary CLI releases and this package is
+ * effectively write-once. A caret would NOT do this — for a 0.x version npm
+ * reads `^0.8.0` as `>=0.8.0 <0.9.0`, which silently freezes the shim at the
+ * current minor (that bug shipped in 0.1.0). `npm run check:range` gates it.
  */
 
 import { createRequire } from 'node:module';
