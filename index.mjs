@@ -1,52 +1,40 @@
 #!/usr/bin/env node
 
 /**
- * `npm create revturbine@latest` — a thin shim over `revturbine init`.
+ * `npm create revturbine@latest` — a pure launcher over `revturbine init`.
  *
- * The scaffold logic lives in @revturbine/cli, NOT here (plan 142 REQ-1).
- * `npm create <name>` resolves the PACKAGE `create-<name>` and never consults
- * `bin` entries on other packages, so this package has to exist — but there is
- * no reason for it to carry a second copy of the logic. Both entry points run
- * the same code:
+ * The scaffold logic lives in @revturbine/cli, not here. This package exists
+ * only because `npm create <name>` resolves the *package* `create-<name>` and
+ * never consults `bin` entries on other packages — so a package by this name
+ * has to exist. It carries no logic and, deliberately, **no `@revturbine/cli`
+ * dependency**.
  *
- *   npm create revturbine@latest   → this shim → revturbine init
- *   pnpm exec revturbine init      → revturbine init
+ * Instead it runs the newest published CLI at run time via `npx …@latest`, so a
+ * CLI release reaches `npm create revturbine@latest` immediately and this
+ * package **never needs republishing** for any CLI version (plan 142 REQ-2,
+ * resolved to a runtime launcher 2026-07-22).
  *
- * The dependency on @revturbine/cli is a PRE-1.0-SPANNING RANGE on purpose
- * (`>=X.Y.Z <1`, REQ-2): it resolves the newest matching CLI at run time, so
- * scaffold improvements ship through ordinary CLI releases and this package is
- * effectively write-once. A caret would NOT do this — for a 0.x version npm
- * reads `^0.8.0` as `>=0.8.0 <0.9.0`, which silently freezes the shim at the
- * current minor (that bug shipped in 0.1.0). `npm run check:range` gates it.
+ * Trade-off owned deliberately (Kent): "always latest" adopts even a breaking
+ * CLI major with no gate *here* — the CLI's own release process is the gate.
+ * The upside is that `create-revturbine` is genuinely write-once after this.
  */
 
-import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
-import path from 'node:path';
 
-const require = createRequire(import.meta.url);
-
-let entry;
-try {
-  const manifestPath = require.resolve('@revturbine/cli/package.json');
-  const manifest = require('@revturbine/cli/package.json');
-  const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.revturbine;
-  if (!bin) throw new Error('@revturbine/cli declares no `revturbine` bin');
-  entry = path.resolve(path.dirname(manifestPath), bin);
-} catch (err) {
-  console.error(`[create-revturbine] could not resolve @revturbine/cli: ${err?.message ?? err}`);
-  console.error('  Install it directly instead:  npm install -D @revturbine/cli && npx revturbine init');
-  process.exit(1);
-}
-
-// Forward every argument through, so `--dir`, `--no-skills`, `--dry-run` and
-// anything the CLI grows later work without a change here.
-const result = spawnSync(process.execPath, [entry, 'init', ...process.argv.slice(2)], {
-  stdio: 'inherit',
-});
+// Everything after `npm create revturbine` is forwarded verbatim to `init`, so
+// --dir / --no-skills / --dry-run and anything the CLI grows later just work.
+const result = spawnSync(
+  'npx',
+  ['--yes', '@revturbine/cli@latest', 'init', ...process.argv.slice(2)],
+  // shell: true so Windows resolves npx.cmd. The argv is a fixed command plus
+  // the user's own flags forwarded through — no interpolation of untrusted
+  // strings into a shell string.
+  { stdio: 'inherit', shell: true },
+);
 
 if (result.error) {
   console.error(`[create-revturbine] could not run the RevTurbine CLI: ${result.error.message}`);
+  console.error('  Install it directly instead:  npm install -D @revturbine/cli && npx revturbine init');
   process.exit(1);
 }
 process.exit(result.status ?? 1);
