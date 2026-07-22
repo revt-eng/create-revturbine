@@ -1,0 +1,40 @@
+name: PR gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      # The caret on @revturbine/cli is what keeps this package write-once
+      # (plan 142 REQ-2). Nothing else would catch a "tidying" pin.
+      - run: npm run check:caret
+
+      - name: Smoke — the shim actually reaches revturbine init
+        run: |
+          set -euo pipefail
+          npm install --no-save @revturbine/cli
+
+          # Assert against init's OWN description, not a substring of the
+          # top-level help. Grepping for "init" anywhere would also match
+          # "instance" and pass against a CLI that has no init command at all —
+          # which is exactly what happened while building this package, against
+          # the then-published 0.7.1.
+          node index.mjs --help > out.txt 2>&1 || true
+          if ! grep -q "Scaffold RevTurbine into this app" out.txt; then
+            echo "::error::Shim did not reach the CLI's init command."
+            cat out.txt
+            exit 1
+          fi
+          echo "Shim reached revturbine init."
