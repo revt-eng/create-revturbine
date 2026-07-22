@@ -41,6 +41,38 @@ where `@revturbine/cli` is pinned **exactly** — the CLI bundles a
 version-stamped schema snapshot, so CLI↔config compatibility is a property of
 your repo and belongs in your lockfile.
 
+## Releasing — manual, on purpose
+
+**This package is released by hand.** That is a decision, not a gap.
+
+Because the caret range means CLI improvements reach users without republishing
+this package, releases here are rare — so the automation is not worth widening a
+credential's blast radius for. Concretely, both secrets that would automate it
+are unavailable to this repo *by design*:
+
+- `REVTURBINE_GIT_TOKEN` (which `auto-tag-release.yml` would use to push the tag)
+  is an org secret with `visibility: private` — it is deliberately kept out of
+  **public** repos, and this repo is public.
+- There is no org-level `NPM_TOKEN`, so `release.yml` cannot publish here until
+  someone adds a repo-level copy.
+
+Both workflows are committed and correct; they simply skip. If releases ever
+become frequent enough to be a friction point, granting those secrets turns the
+process automatic with no code change.
+
+To cut a release until then:
+
+```bash
+# 1. bump the version in package.json, commit, merge to main
+# 2. tag and push
+git tag v0.1.0 && git push origin v0.1.0
+# 3. publish (npm 2FA prompts for an OTP or browser approval)
+npm publish --access public
+```
+
+Run `npm run check:caret` first — it is what keeps the `@revturbine/cli`
+dependency a caret, and nothing else would catch a pin.
+
 ## Links
 
 - [Docs](https://revturbine.com/docs)
