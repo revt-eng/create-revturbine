@@ -1,6 +1,6 @@
 {
   "name": "create-revturbine",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Scaffold RevTurbine into an app — installs the SDK, pins the CLI, drops a starter Playbook, and installs the Agent Skills.",
   "license": "MIT",
   "repository": {
@@ -25,11 +25,5 @@
     "monetization",
     "create",
     "scaffold"
-  ],
-  "dependencies": {
-    "@revturbine/cli": ">=0.9.0 <1"
-  },
-  "scripts": {
-    "check:range": "node scripts/check-cli-range.mjs"
-  }
+  ]
 }

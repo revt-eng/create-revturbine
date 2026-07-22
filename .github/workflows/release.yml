@@ -27,7 +27,6 @@ jobs:
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
-      - run: npm run check:range
       - name: Guard — tag must match package.json version
         run: |
           PKG_VERSION="v$(node -p "require('./package.json').version")"
