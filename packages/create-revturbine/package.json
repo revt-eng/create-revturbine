@@ -5,7 +5,8 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/revt-eng/create-revturbine.git"
+    "url": "git+https://github.com/revt-eng/create-revturbine.git",
+    "directory": "packages/create-revturbine"
   },
   "homepage": "https://revturbine.com",
   "bugs": "https://github.com/revt-eng/create-revturbine/issues",

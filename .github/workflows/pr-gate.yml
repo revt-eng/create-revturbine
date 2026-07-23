@@ -17,16 +17,18 @@ jobs:
         with:
           node-version: 24
 
-      - name: Smoke — the launcher reaches `revturbine init` via npx @latest
+      - name: Smoke — each launcher reaches `revturbine init` via npx @latest
         run: |
           set -euo pipefail
-          # No declared dependency: the launcher fetches @revturbine/cli@latest
-          # at run time. Assert it reaches init's OWN help — grepping for "init"
-          # anywhere would also match "instance".
-          node index.mjs --help > out.txt 2>&1 || true
-          if ! grep -q "Scaffold RevTurbine into this app" out.txt; then
-            echo "::error::Launcher did not reach the CLI's init command."
-            cat out.txt
-            exit 1
-          fi
-          echo "Launcher reached revturbine init."
+          # Both packages are runtime launchers with no declared @revturbine/cli
+          # dependency; they fetch it at run time. Assert each reaches init's OWN
+          # help — grepping for "init" anywhere would also match "instance".
+          echo "— create-revturbine —"
+          node packages/create-revturbine/index.mjs --help > cr.txt 2>&1 || true
+          grep -q "Scaffold RevTurbine into this app" cr.txt || { echo "::error::create-revturbine did not reach init"; cat cr.txt; exit 1; }
+
+          echo "— revturbine (create) —"
+          node packages/revturbine/index.mjs create --help > rv.txt 2>&1 || true
+          grep -q "Scaffold RevTurbine into this app" rv.txt || { echo "::error::revturbine create did not reach init"; cat rv.txt; exit 1; }
+
+          echo "Both launchers reach the CLI."

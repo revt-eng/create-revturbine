@@ -1,0 +1,30 @@
+{
+  "name": "revturbine",
+  "version": "0.1.0",
+  "description": "The RevTurbine CLI launcher — `npx revturbine create` scaffolds RevTurbine into your app.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/revt-eng/create-revturbine.git",
+    "directory": "packages/revturbine"
+  },
+  "homepage": "https://revturbine.com",
+  "bugs": "https://github.com/revt-eng/create-revturbine/issues",
+  "type": "module",
+  "bin": {
+    "revturbine": "index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "keywords": [
+    "revturbine",
+    "monetization",
+    "cli",
+    "scaffold"
+  ]
+}

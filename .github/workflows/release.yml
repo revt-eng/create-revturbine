@@ -1,13 +1,13 @@
 name: Release
 
-# Publishes `create-revturbine` to the PUBLIC npm registry when a v* tag is
-# pushed. Modelled on revturbine-cli's release workflow: the tag drives the
-# release, package.json's version is what ships, and a guard refuses a tag that
-# disagrees with it.
+# Publishes the launcher packages under packages/* to the PUBLIC npm registry
+# on any `v*` tag. Both packages are runtime launchers (they fetch
+# @revturbine/cli@latest), so releases are rare — a tag just means "publish
+# whatever version is not already on npm". Each package is versioned
+# independently in its own package.json; bump the one you changed and push any
+# `v*` tag.
 #
-# Requires the NPM_TOKEN secret (an npm automation token with publish rights).
-# Automation tokens bypass 2FA — which is the whole reason releases run here
-# rather than from someone's laptop.
+# Requires the NPM_TOKEN secret (an npm automation token; bypasses 2FA).
 
 on:
   push:
@@ -27,14 +27,18 @@ jobs:
         with:
           node-version: 24
           registry-url: 'https://registry.npmjs.org'
-      - name: Guard — tag must match package.json version
-        run: |
-          PKG_VERSION="v$(node -p "require('./package.json').version")"
-          if [ "$GITHUB_REF_NAME" != "$PKG_VERSION" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json ($PKG_VERSION). Bump package.json and re-tag."
-            exit 1
-          fi
-      - name: Publish to public npm
-        run: npm publish --access public --provenance
+      - name: Publish each package whose version is not already on npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          for dir in packages/*/; do
+            name=$(node -p "require('./$dir/package.json').name")
+            version=$(node -p "require('./$dir/package.json').version")
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "· $name@$version already on npm — skipping"
+            else
+              echo "→ publishing $name@$version"
+              ( cd "$dir" && npm publish --access public --provenance )
+            fi
+          done
