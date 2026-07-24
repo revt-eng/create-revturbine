@@ -36,8 +36,11 @@ Inside a repo that already pins `@revturbine/cli`, npx resolves the repo-local
 `revturbine` (the pinned CLI) before this launcher — so a pinned version always
 wins.
 
-Prefer `revturbine init` / `revturbine create` once the CLI is pinned in your
-repo (added RevTurbine to a monorepo package, or re-scaffolding).
+`npx revturbine create` needs nothing pre-installed — it's the clean-machine
+front door, and the launcher fetches the CLI for you. Once `@revturbine/cli` is
+pinned in your repo, prefer `revturbine init` to re-run the scaffold (adding
+RevTurbine to a monorepo package, or re-scaffolding), since npx then resolves the
+repo-local pinned CLI.
 
 ## Links
 
