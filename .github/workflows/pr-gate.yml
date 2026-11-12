@@ -1,5 +1,12 @@
 name: PR gate
 
+# Check level L1 (EP-1747) through the shared check-level workflow on our
+# CodeBuild runners. This repository is public, so it calls the generated copy
+# in .github/workflows/ci-level.yml (never edit it here; the devkit regenerates
+# it), which owns the runner label and sends pull requests from forks to
+# GitHub-hosted runners. There is no root package.json, so the job passes its
+# command and installs nothing.
+
 on:
   pull_request:
   push:
@@ -10,26 +17,22 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || format('codebuild-helm-ci-backlog-{0}-{1}', github.run_id, github.run_attempt) }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
+    uses: ./.github/workflows/ci-level.yml
+    with:
+      level: l1
+      node-version: '24'
+      package-manager: none
+      # Smoke — each launcher reaches `revturbine init` via npx @latest.
+      # Both packages are runtime launchers with no declared @revturbine/cli
+      # dependency; they fetch it at run time. Assert each reaches init's OWN
+      # help — grepping for "init" anywhere would also match "instance".
+      command: |
+        echo "— create-revturbine —"
+        node packages/create-revturbine/index.mjs --help > cr.txt 2>&1 || true
+        grep -qE "^Usage: revturbine init[|]create \[options\]" cr.txt || { echo "::error::create-revturbine did not reach init"; cat cr.txt; exit 1; }
 
-      - name: Smoke â€” each launcher reaches `revturbine init` via npx @latest
-        run: |
-          set -euo pipefail
-          # Both packages are runtime launchers with no declared @revturbine/cli
-          # dependency; they fetch it at run time. Assert each reaches init's OWN
-          # help â€” grepping for "init" anywhere would also match "instance".
-          echo "â€” create-revturbine â€”"
-          node packages/create-revturbine/index.mjs --help > cr.txt 2>&1 || true
-          grep -qE "^Usage: revturbine init[|]create \[options\]" cr.txt || { echo "::error::create-revturbine did not reach init"; cat cr.txt; exit 1; }
+        echo "— revturbine (create) —"
+        node packages/revturbine/index.mjs create --help > rv.txt 2>&1 || true
+        grep -qE "^Usage: revturbine init[|]create \[options\]" rv.txt || { echo "::error::revturbine create did not reach init"; cat rv.txt; exit 1; }
 
-          echo "â€” revturbine (create) â€”"
-          node packages/revturbine/index.mjs create --help > rv.txt 2>&1 || true
-          grep -qE "^Usage: revturbine init[|]create \[options\]" rv.txt || { echo "::error::revturbine create did not reach init"; cat rv.txt; exit 1; }
-
-          echo "Both launchers reach the CLI."
+        echo "Both launchers reach the CLI."
