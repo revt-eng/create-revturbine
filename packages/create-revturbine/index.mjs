@@ -21,11 +21,35 @@
 
 import { spawnSync } from 'node:child_process';
 
+// The @revturbine/cli dist-tag this launcher runs. A published release runs
+// `latest`. A Release prerelease (.github/workflows/release-prerelease.yml,
+// EP-1747 phase 5) stamps that Release's dist-tag, rl-<n>, here, so
+// `npm create revturbine@rl-<n>` runs the Release's CLI as a developer would; a
+// Release with no CLI prerelease has no such tag, and the launcher runs latest.
+const CLI_TAG = 'latest';
+
+function cliSpec() {
+  if (CLI_TAG === 'latest') return '@revturbine/cli@latest';
+  // A prerelease launcher says on stderr which CLI it runs, and why when it falls back.
+  const probe = spawnSync('npm', ['view', `@revturbine/cli@${CLI_TAG}`, 'version'], { encoding: 'utf8', shell: true });
+  const version = probe.status === 0 ? String(probe.stdout).trim() : '';
+  if (version) {
+    console.error(`[create-revturbine] Running @revturbine/cli@${CLI_TAG} (${version}), this Release's CLI.`);
+    return `@revturbine/cli@${CLI_TAG}`;
+  }
+  const detail = String(probe.stderr || probe.error?.message || '').trim().split(/\r?\n/)[0];
+  const why = /E404|No match found/.test(String(probe.stderr)) || probe.status === 0
+    ? `@revturbine/cli has no ${CLI_TAG} dist-tag, so this Release has no CLI prerelease`
+    : `npm view @revturbine/cli@${CLI_TAG} failed (${detail || `exit ${probe.status}`})`;
+  console.error(`[create-revturbine] ${why}; running @revturbine/cli@latest instead.`);
+  return '@revturbine/cli@latest';
+}
+
 // Everything after `npm create revturbine` is forwarded verbatim to `init`, so
 // --dir / --no-skills / --dry-run and anything the CLI grows later just work.
 const result = spawnSync(
   'npx',
-  ['--yes', '@revturbine/cli@latest', 'init', ...process.argv.slice(2)],
+  ['--yes', cliSpec(), 'init', ...process.argv.slice(2)],
   // shell: true so Windows resolves npx.cmd. The argv is a fixed command plus
   // the user's own flags forwarded through — no interpolation of untrusted
   // strings into a shell string.

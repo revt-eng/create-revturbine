@@ -1,0 +1,109 @@
+name: Release prerelease
+
+# EP-1747 phase 5 (ST-1758): a push to a Release branch, release/RL-<n>,
+# publishes both launchers to public npm as <next>-rl.<n>.<k> and points the
+# dist-tag rl-<n> at them, so the Dev Community Manager's devrel-examples-run can create a fresh
+# app from the Release as a developer would: `npm create revturbine@rl-<n>` or
+# `npx revturbine@rl-<n> create`.
+#   <next>  each package.json's version when it is not on npm yet (a bump already
+#           in the Release), else its next patch; only a prediction, the final
+#           version is read from the registry after the merge (decision 7).
+#   <k>     this workflow's run number: it only grows, and a re-run keeps it, so a
+#           re-run of the same commit finds its versions already published from
+#           that commit (the registry's gitHead says so) and does not publish them
+#           again.
+# Both packages publish every time, not only a changed one: each build also
+# stamps CLI_TAG in its index.mjs with rl-<n>, so the prerelease launchers run
+# the Release's @revturbine/cli (falling back to latest when the Release has no
+# CLI prerelease), which a published launcher never does. Versions, the stamp and
+# the commit (as gitHead) go into this job's checkout only, never committed.
+# scripts/release-prerelease.mjs checks both packages' dist-tags first (each needs
+# a `latest` that is a release), publishes each under this run's own dist-tag
+# rl-<n>-<k>, and only when both succeeded points rl-<n> at the pair (never
+# backwards, never one package alone) and removes rl-<n>-<k>. It never writes
+# `latest`, except to put back a `latest` the registry moved to a prerelease, and
+# reports `name@version` lines to the job summary and to a check run named
+# `release-prerelease` on the commit, which Backlog reads and confirms against
+# the registry. Final versions still publish from release.yml.
+#
+# Runner: GitHub-hosted, like release.yml. npm generates provenance only on a
+# cloud-hosted runner and the registry refuses a statement from a self-hosted one
+# (revturbine-devkit docs/ops/ci-levels.md).
+#
+# workflow_dispatch re-runs it for a Release branch's head (a push made with a
+# workflow's GITHUB_TOKEN starts no push-triggered workflow); any other ref is
+# skipped.
+
+on:
+  push:
+    branches: ['release/RL-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # npm provenance
+  checks: write # the release-prerelease check run
+
+concurrency:
+  group: release-prerelease-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish
+    if: startsWith(github.ref, 'refs/heads/release/RL-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+      - name: Plan the prerelease versions
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }} # reads an earlier report on this commit
+        run: node scripts/release-prerelease.mjs plan --package packages/create-revturbine --package packages/revturbine --github-output
+      - name: Stamp the versions and the Release's CLI tag into this checkout (never committed)
+        if: steps.plan.outputs.reuse == 'false'
+        env:
+          RL_TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for dir in packages/create-revturbine packages/revturbine; do
+            version="$(node scripts/release-prerelease.mjs version "$dir")"
+            (cd "$dir" && npm version "$version" --no-git-tag-version)
+            node scripts/release-prerelease.mjs stamp "$dir"
+            sed -i "s/^const CLI_TAG = 'latest';\$/const CLI_TAG = '$RL_TAG';/" "$dir/index.mjs"
+            grep -qx "const CLI_TAG = '$RL_TAG';" "$dir/index.mjs" || { echo "::error::$dir/index.mjs has no CLI_TAG line to stamp"; exit 1; }
+          done
+      - name: Smoke the stamped launchers
+        if: steps.plan.outputs.reuse == 'false'
+        run: |
+          set -euo pipefail
+          node packages/create-revturbine/index.mjs --help > cr.txt 2>&1 || true
+          grep -qE "^Usage: revturbine init[|]create \[options\]" cr.txt || { echo "::error::create-revturbine did not reach init"; cat cr.txt; exit 1; }
+          node packages/revturbine/index.mjs create --help > rv.txt 2>&1 || true
+          grep -qE "^Usage: revturbine init[|]create \[options\]" rv.txt || { echo "::error::revturbine create did not reach init"; cat rv.txt; exit 1; }
+      - name: Publish each launcher under this run's dist-tag
+        if: steps.plan.outputs.reuse == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release-prerelease.mjs publish --all -- --access public --provenance
+      - name: Point rl-<n> at both
+        if: steps.plan.outputs.reuse == 'false'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: node scripts/release-prerelease.mjs promote
+      - name: Report
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-prerelease.mjs report
+      - name: Report the failure
+        if: failure()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/release-prerelease.mjs report --failed

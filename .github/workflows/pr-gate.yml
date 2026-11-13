@@ -36,3 +36,10 @@ jobs:
         grep -qE "^Usage: revturbine init[|]create \[options\]" rv.txt || { echo "::error::revturbine create did not reach init"; cat rv.txt; exit 1; }
 
         echo "Both launchers reach the CLI."
+
+        # EP-1747 phase 5: the Release prerelease script, and the line its
+        # workflow (release-prerelease.yml) stamps with the Release's CLI tag.
+        node --test scripts/release-prerelease.test.mjs
+        for launcher in packages/*/index.mjs; do
+          grep -qx "const CLI_TAG = 'latest';" "$launcher" || { echo "::error::$launcher has no CLI_TAG line for release-prerelease.yml to stamp"; exit 1; }
+        done
