@@ -20,12 +20,25 @@
 
 import { spawnSync } from 'node:child_process';
 
+// The @revturbine/cli dist-tag this launcher runs. A published release runs
+// `latest`. A Release prerelease (.github/workflows/release-prerelease.yml,
+// EP-1747 phase 5) stamps that Release's dist-tag, rl-<n>, here, so
+// `npx revturbine@rl-<n> create` runs the Release's CLI as a developer would; a
+// Release with no CLI prerelease has no such tag, and the launcher runs latest.
+const CLI_TAG = 'latest';
+
+function cliSpec() {
+  if (CLI_TAG === 'latest') return '@revturbine/cli@latest';
+  const probe = spawnSync('npm', ['view', `@revturbine/cli@${CLI_TAG}`, 'version'], { encoding: 'utf8', shell: true });
+  return probe.status === 0 && probe.stdout.trim() ? `@revturbine/cli@${CLI_TAG}` : '@revturbine/cli@latest';
+}
+
 // Forward every argument verbatim: `npx revturbine create --dir foo` becomes
 // `@revturbine/cli@latest create --dir foo`. `create` resolves to the CLI's
 // `init` command via its alias.
 const result = spawnSync(
   'npx',
-  ['--yes', '@revturbine/cli@latest', ...process.argv.slice(2)],
+  ['--yes', cliSpec(), ...process.argv.slice(2)],
   // shell: true so Windows resolves npx.cmd. Argv is a fixed command plus the
   // user's own forwarded flags — no interpolation of untrusted strings.
   { stdio: 'inherit', shell: true },
