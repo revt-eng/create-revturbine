@@ -30,8 +30,19 @@ const CLI_TAG = 'latest';
 
 function cliSpec() {
   if (CLI_TAG === 'latest') return '@revturbine/cli@latest';
+  // A prerelease launcher says on stderr which CLI it runs, and why when it falls back.
   const probe = spawnSync('npm', ['view', `@revturbine/cli@${CLI_TAG}`, 'version'], { encoding: 'utf8', shell: true });
-  return probe.status === 0 && probe.stdout.trim() ? `@revturbine/cli@${CLI_TAG}` : '@revturbine/cli@latest';
+  const version = probe.status === 0 ? String(probe.stdout).trim() : '';
+  if (version) {
+    console.error(`[create-revturbine] Running @revturbine/cli@${CLI_TAG} (${version}), this Release's CLI.`);
+    return `@revturbine/cli@${CLI_TAG}`;
+  }
+  const detail = String(probe.stderr || probe.error?.message || '').trim().split(/\r?\n/)[0];
+  const why = /E404|No match found/.test(String(probe.stderr)) || probe.status === 0
+    ? `@revturbine/cli has no ${CLI_TAG} dist-tag, so this Release has no CLI prerelease`
+    : `npm view @revturbine/cli@${CLI_TAG} failed (${detail || `exit ${probe.status}`})`;
+  console.error(`[create-revturbine] ${why}; running @revturbine/cli@latest instead.`);
+  return '@revturbine/cli@latest';
 }
 
 // Everything after `npm create revturbine` is forwarded verbatim to `init`, so
